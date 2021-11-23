@@ -9,9 +9,10 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.ArClient">
+        
         <service
-
-
+            android.name=".ui.MediaProjectionAccessService"
+            android:foregroundServiceType="mediaProjection"
             />
         
         <activity
