@@ -2,18 +2,17 @@ package com.example.arclient;
 
 import androidx.appcompat.app.AppCompatActivity;
 
-import android.media.MediaRecorder;
-import android.media.projection.MediaProjection;
 import android.os.Bundle;
+import android.view.View;
+import android.widget.Button;
 import android.widget.TextView;
 
 import com.example.arclient.databinding.ActivityMainBinding;
 
-import org.opencv.core.Mat;
-
-import org.opencv.android.CameraBridgeViewBase;
-
 public class MainActivity extends AppCompatActivity {
+
+    private static final String TAG = "MainActivity";
+    private Streamizer _stream;
 
 
     // Used to load the 'arclient' library on application startup.
@@ -33,34 +32,24 @@ public class MainActivity extends AppCompatActivity {
         // Example of a call to a native method
         TextView tv = binding.sampleText;
         tv.setText(stringFromJNI());
-        Mat mat = new Mat();
 
-        CameraBridgeViewBase cb = new CameraBridgeViewBase();
-        
+        _init();
 
-    
     }
+    public void _init() {
 
-    // TODO : Foreground Service : https://developer.android.com/guide/components/services#java
-    
-    void foregroundMethod() {
+        _stream = Streamizer._build(this);
+        _stream._init();
 
-        Intent notifiactionIntent = new Intent(this, MainActivity.class);
-        PendingIntent pendingIntent =
-            PendingIntent.getActivity(this, 0, notifiactionIntent, 0);
+        ((Button) findViewById(R.id.startbutton))
 
-        Notification notification =
-            new Notification.Builder(this, CHANNEL_DEFAULT_IMPORTANCE)
-            .setContentTitle(getText(R.string.notification_title))
-            .setContentText(getText(R.string.notification_message))
-            .setSmallIcon(R.drawable.icon)
-            .setContentIntent(pendingIntent)
-            .setTicker(getText(R.string.ticker_text))
-            .build();
-  
+                .setOnClickListener((View v) -> { _stream._launch(); });
+
+        ((Button) findViewById(R.id.stopbutton))
+
+                .setOnClickListener((View v) -> { _stream._stop(); });
+
     }
-
-
     /**
      * A native method that is implemented by the 'arclient' native library,
      * which is packaged with this application.
