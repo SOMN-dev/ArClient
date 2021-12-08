@@ -5,14 +5,21 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.graphics.ImageFormat;
 import android.graphics.PixelFormat;
+import android.graphics.SurfaceTexture;
+import android.hardware.HardwareBuffer;
 import android.hardware.display.DisplayManager;
 import android.hardware.display.VirtualDisplay;
 import android.media.Image;
 import android.media.ImageReader;
 import android.media.projection.MediaProjection;
 import android.media.projection.MediaProjectionManager;
+import android.opengl.Matrix;
+import android.os.Build;
+import android.os.Handler;
 import android.util.DisplayMetrics;
+import android.util.Log;
 import android.view.Display;
 import android.view.Surface;
 import android.view.WindowManager;
@@ -22,8 +29,13 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContract;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.android.grafika.gles.EglCore;
+import com.android.grafika.gles.FullFrameRect;
+import com.android.grafika.gles.OffscreenSurface;
+import com.android.grafika.gles.Texture2dProgram;
 import com.example.arclient.Castable;
 
 import org.opencv.android.Utils;
@@ -36,8 +48,11 @@ import org.opencv.imgproc.Imgproc;
 import org.opencv.utils.Converters;
 
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 public class DisplayBridge implements Castable {
+
+    private static final String TAG = "DisplayBridge";
 
     private static int width;
     private static int height;
@@ -53,11 +68,10 @@ public class DisplayBridge implements Castable {
     private static ImageReader imageReader;
     private static ActivityResultLauncher<Intent> projection;
     private static DisplayMetrics displayMetrics;
+    private static ImageReader.OnImageAvailableListener imageAvailableListener;
 
     @Override
     public void cast(Object... obj) {
-
-        System.loadLibrary("opencv_java4");
 
         _context = (Context) obj[0];
         ActivityResultCallback<ImageReader> _callback = (ActivityResultCallback<ImageReader>) obj[1];
@@ -73,6 +87,7 @@ public class DisplayBridge implements Castable {
     @Override
     public void launch(Object... obj) {
 
+        imageAvailableListener = (ImageReader.OnImageAvailableListener) obj[0];
         projection.launch(mediaProjectionManager.createScreenCaptureIntent());
 
     }
@@ -91,8 +106,46 @@ public class DisplayBridge implements Castable {
         height = displayMetrics.heightPixels;
         dpi = displayMetrics.densityDpi;
 
-        imageReader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 2);
         mediaProjection = mediaProjectionManager.getMediaProjection(resultCode, intent);
+
+        imageReader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 2);
+
+        // EGLSurface
+
+        /*
+        EglCore eglCore = new EglCore(null, EglCore.FLAG_TRY_GLES3);
+        OffscreenSurface eglConsumerSide = new OffscreenSurface(eglCore, width, height);
+        eglConsumerSide.makeCurrent();
+
+        Texture2dProgram eglShader = new Texture2dProgram(Texture2dProgram.ProgramType.TEXTURE_EXT);
+        FullFrameRect eglScreen = new FullFrameRect(eglShader);
+
+        int eglTextureID = eglScreen.createTextureObject();
+        @SuppressLint("Recycle")
+        SurfaceTexture eglTexture = new SurfaceTexture(eglTextureID, false);
+        eglTexture.setDefaultBufferSize(width,height);
+
+        ByteBuffer eglBuffer = ByteBuffer.allocate(width * height * 4);
+        eglBuffer.order(ByteOrder.nativeOrder());
+
+
+        Bitmap eglCurrentBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+
+        Surface eglProducerSide = new Surface(eglTexture);
+        eglTexture.setOnFrameAvailableListener((surfaceTexture)
+        -> {
+
+            Float[] eglMatrix;
+
+            eglConsumerSide.makeCurrent();
+            eglTexture.updateTexImage();
+            eglTexture.get
+            eglTexture.getTransformMatrix();
+
+        });  */
+
+        //
+
         virtualDisplay = mediaProjection.createVirtualDisplay(
 
                 "Q",
@@ -106,21 +159,15 @@ public class DisplayBridge implements Castable {
 
         );
 
-        imageReader.setOnImageAvailableListener((reader)
-        -> {
+        imageReader.setOnImageAvailableListener(imageAvailableListener, null);
 
-            Image image = reader.acquireLatestImage();
-            ByteBuffer bb = image.getPlanes()[0].getBuffer();
-            byte[] data = new byte[bb.remaining()];
-            bb.get(data);
 
-            Mat mat = new Mat();
-            //Utils.bitmapToMat(new Bitmap(),mat);
-            image.close();
-
-        } , null);
     }
+    public static void release() {
 
+        virtualDisplay.release();
+
+    }
     public static class MediaProjectionResultContract<O> extends ActivityResultContract<Intent, O> {
 
         @NonNull
@@ -130,11 +177,11 @@ public class DisplayBridge implements Castable {
             return input;
 
         }
-
         @Override
         public O parseResult(int resultCode, @Nullable Intent intent) {
 
             test(resultCode, intent);
+            Log.d(TAG, "parseResult");
             return (resultCode == Activity.RESULT_OK && intent != null)
                     ? (O) imageReader
                     : null;
@@ -142,4 +189,5 @@ public class DisplayBridge implements Castable {
 
         }
     }
+    public interface OnLaunchCallback extends ImageReader.OnImageAvailableListener {}
 }
